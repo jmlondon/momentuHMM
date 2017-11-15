@@ -11,9 +11,9 @@ MIfitHMM(miData, nSims, ncores, poolEstimates = TRUE, alpha = 0.95,
   DM = NULL, cons = NULL, userBounds = NULL, workcons = NULL,
   stateNames = NULL, knownStates = NULL, fixPar = NULL, retryFits = 0,
   covNames = NULL, spatialCovs = NULL, centers = NULL, angleCovs = NULL,
-  method = "IS", parIS = 1000, dfSim = Inf, grid.eps = 1, crit = 2.5,
-  scaleSim = 1, force.quad = TRUE, fullPost = TRUE, dfPostIS = Inf,
-  scalePostIS = 1, thetaSamp = NULL)
+  fixPath = NULL, method = "IS", parIS = 1000, dfSim = Inf,
+  grid.eps = 1, crit = 2.5, scaleSim = 1, force.quad = TRUE,
+  fullPost = TRUE, dfPostIS = Inf, scalePostIS = 1, thetaSamp = NULL)
 }
 \arguments{
 \item{miData}{A \code{\link{crwData}} object, a \code{\link{crwSim}} object, or a list of \code{\link{momentuHMMData}} objects.}
@@ -100,6 +100,8 @@ See \code{\link{prepData}}. Ignored unless \code{miData} is a \code{\link{crwDat
 
 \item{angleCovs}{Character vector indicating the names of any circular-circular regression angular covariates in \code{miData$crwPredict} that need conversion from standard direction (in radians relative to the x-axis) to turning angle (relative to previous movement direction) 
 See \code{\link{prepData}}. Ignored unless \code{miData} is a \code{\link{crwData}} object.}
+
+\item{fixPath}{List with elements `res_raster' and `trans' for correcting coordinates that travel through a restricted area. See \code{\link{prepData}}. Ignored unless \code{miData} is a \code{\link{crwData}} object.}
 
 \item{method}{Method for obtaining weights for movement parameter samples. See \code{\link[crawl]{crwSimulator}}. Ignored unless \code{miData} is a \code{\link{crwData}} object.}
 

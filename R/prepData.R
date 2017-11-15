@@ -29,12 +29,17 @@
 #' or \code{\link{MIfitHMM}}.
 #' @param angleCovs Character vector indicating the names of any circular-circular regression angular covariates in \code{data} or \code{spatialCovs} that need conversion from standard direction (in radians relative to the x-axis) to turning angle (relative to previous movement direction) 
 #' using \code{\link{circAngles}}.
+#' @param fixPath List with elements \code{res_raster} and \code{trans} for correcting coordinates that travel through a restricted area based on \code{\link[gdistance]{shortestPath}}.  See \code{\link[crawl]{fix_path}}.  
+#' When \code{fixPath} is specified, then step lengths, turning angles, and covariates based on location are calculated from the corrected coordinates \code{x.fix} and \code{y.fix}. 
+#' Ignored unless \code{coordNames} is specified or \code{data} is a \code{crwData} object.
 
 #' @return An object \code{\link{momentuHMMData}}, i.e., a dataframe of:
 #' \item{ID}{The ID(s) of the observed animal(s)}
 #' \item{...}{Data streams (e.g., 'step', 'angle', etc.)}
 #' \item{x}{Either easting or longitude (if \code{coordNames} is specified or \code{data} is a \code{crwData} object)}
 #' \item{y}{Either norting or latitude (if \code{coordNames} is specified or \code{data} is a \code{crwData} object)}
+#' \item{x.fix}{Corrected easting (if \code{fixPath} is specified)}
+#' \item{y.fix}{Corrected northing (if \code{fixPath} is specified)}
 #' \item{...}{Covariates (if any)}
 #' 
 #' If \code{data} is a \code{\link{crwData}} object, the \code{\link{momentuHMMData}} object created by \code{prepData} includes step lengths and turning angles calculated from the best predicted 
@@ -74,15 +79,31 @@
 #' data <- data.frame(coord1=coord1,coord2=coord2,cov1=cov1,cov2=cov2)
 #' d <- prepData(data,coordNames=c("coord1","coord2"),covNames="cov1",
 #'               angleCovs="cov2")
+#'          
+#' \dontrun{                   
+#' # use fixPath based on `forest' spatial covariate
+#' res_raster <- forest
+#' res_raster[which(raster::getValues(forest)==0)]<-1
+#' res_raster[which(raster::getValues(forest)>0)]<-0
+#' 
+#' forestInd <- raster::asFactor(1 - res_raster)
+#' trans <- gdistance::transition(forestInd, "areas", directions = 16)[[1]]
+#' fixPath <- list(res_raster = res_raster, trans = trans)
+#' 
+#' data <- data.frame(x=rep(-10000,100),y=seq(35000,0,length=100))
+#' d <- prepData(data,fixPath=fixPath)
+#' }
 #' 
 #' @export
 #' @importFrom sp spDistsN1
 #' @importFrom raster cellFromXY getValues getZ
+#' @importFrom crawl fix_path
 
-prepData <- function(data, type=c('UTM','LL'),coordNames=c("x","y"),covNames=NULL,spatialCovs=NULL,centers=NULL,angleCovs=NULL)
+prepData <- function(data, type=c('UTM','LL'),coordNames=c("x","y"),covNames=NULL,spatialCovs=NULL,centers=NULL,angleCovs=NULL,fixPath=NULL)
 {
   if(is.crwData(data)){
     predData <- data$crwPredict
+    Time.name<-attr(predData,"Time.name")
     if(!is.null(covNames) | !is.null(angleCovs)){
       covNames <- unique(c(covNames,angleCovs[!(angleCovs %in% names(spatialCovs))]))
       if(!length(covNames)) covNames <- NULL
@@ -91,7 +112,7 @@ prepData <- function(data, type=c('UTM','LL'),coordNames=c("x","y"),covNames=NUL
     if(length(znames))
       if(!all(znames %in% names(predData))) stop("z-values for spatialCovs raster stack or brick not found in ",deparse(substitute(data)),"$crwPredict")
     distnames <- names(predData)[which(!(names(predData) %in% c("ID","x","y",covNames,znames)))]
-    data <- data.frame(x=predData$mu.x,y=predData$mu.y,predData[,c("ID",distnames,covNames,znames),drop=FALSE])[which(predData$locType=="p"),]
+    data <- data.frame(x=predData$mu.x,y=predData$mu.y,predData[,c("ID",distnames,covNames,znames),drop=FALSE],time=predData[[Time.name]])[which(predData$locType=="p"),]
     type <- 'UTM'
     coordNames <- c("x","y")
   }
@@ -152,13 +173,23 @@ prepData <- function(data, type=c('UTM','LL'),coordNames=c("x","y"),covNames=NUL
   
   nbAnimals <- length(unique(ID))
   
-  # check that each animal's observations are contiguous
+  # check that each animal's observations are contiguous and fix path
   for(i in 1:nbAnimals) {
     ind <- which(ID==unique(ID)[i])
     if(length(ind)!=length(ind[1]:ind[length(ind)]))
       stop("Each animal's obervations must be contiguous.")
     if(!is.null(coordNames))
       if(length(ind)<3) stop('each individual must have at least 3 observations to calculate step lengths and turning angles')
+    
+    # fix path
+    if(!is.null(fixPath)){
+      if(type=="LL") stop("coordinate type must be UTM when fixPath is specified")
+      tmpDat <- data[ind,]
+      if(is.null(tmpDat$time)) tmpDat$time <- 1:length(ind)
+      m <- crawl::fix_path(xy = as.matrix(tmpDat[,coordNames]), time = tmpDat$time, res_raster = fixPath$res_raster, trans = fixPath$trans)
+      x[ind][match(tmpDat$time,m[,"time"],nomatch=0)] <- m[,"x"]
+      y[ind][match(tmpDat$time,m[,"time"],nomatch=0)] <- m[,"y"]
+    }
   }
   
   for(zoo in 1:nbAnimals) {
@@ -220,12 +251,17 @@ prepData <- function(data, type=c('UTM','LL'),coordNames=c("x","y"),covNames=NUL
   } else covs<-NULL
   
   if(!is.null(coordNames)) {
-    dataHMM <- cbind(dataHMM,x=x,y=y)
+    dataHMM <- cbind(dataHMM,x=data[,coordNames[1]],y=data[,coordNames[2]])
+    coords <- c("x","y")
+    if(!is.null(fixPath)){
+      dataHMM <- cbind(dataHMM,x.fix=x,y.fix=y)
+      coords <- c("x.fix","y.fix")
+    }
     class(dataHMM$angle)<-c(class(dataHMM$angle), "angle")
     if(nbSpatialCovs){
       spCovs<-numeric()
       xy<-dataHMM
-      sp::coordinates(xy)<-c("x","y")
+      sp::coordinates(xy)<-coords
       for(j in 1:nbSpatialCovs){
         getCells<-raster::cellFromXY(spatialCovs[[j]],xy)
         if(any(is.na(getCells))) stop("Location data are beyond the spatial extent of the ",spatialcovnames[j]," raster. Try expanding the extent of the raster.")

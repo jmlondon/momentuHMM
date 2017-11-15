@@ -5,7 +5,8 @@
 \title{Preprocessing of the data streams and covariates}
 \usage{
 prepData(data, type = c("UTM", "LL"), coordNames = c("x", "y"),
-  covNames = NULL, spatialCovs = NULL, centers = NULL, angleCovs = NULL)
+  covNames = NULL, spatialCovs = NULL, centers = NULL, angleCovs = NULL,
+  fixPath = NULL)
 }
 \arguments{
 \item{data}{Either a data frame of data streams or a \code{\link{crwData}} object (as returned by \code{\link{crawlWrap}}). If \code{data} is a data frame, it can optionally include a field \code{ID}
@@ -39,6 +40,10 @@ or \code{\link{MIfitHMM}}.}
 
 \item{angleCovs}{Character vector indicating the names of any circular-circular regression angular covariates in \code{data} or \code{spatialCovs} that need conversion from standard direction (in radians relative to the x-axis) to turning angle (relative to previous movement direction) 
 using \code{\link{circAngles}}.}
+
+\item{fixPath}{List with elements \code{res_raster} and \code{trans} for correcting coordinates that travel through a restricted area based on \code{\link[gdistance]{shortestPath}}.  See \code{\link[crawl]{fix_path}}.
+When \code{fixPath} is specified, then step lengths, turning angles, and covariates based on location are calculated from the corrected coordinates \code{x.fix} and \code{y.fix}. 
+Ignored unless \code{coordNames} is specified or \code{data} is a \code{crwData} object.}
 }
 \value{
 An object \code{\link{momentuHMMData}}, i.e., a dataframe of:
@@ -46,6 +51,8 @@ An object \code{\link{momentuHMMData}}, i.e., a dataframe of:
 \item{...}{Data streams (e.g., 'step', 'angle', etc.)}
 \item{x}{Either easting or longitude (if \code{coordNames} is specified or \code{data} is a \code{crwData} object)}
 \item{y}{Either norting or latitude (if \code{coordNames} is specified or \code{data} is a \code{crwData} object)}
+\item{x.fix}{Corrected easting (if \code{fixPath} is specified)}
+\item{y.fix}{Corrected northing (if \code{fixPath} is specified)}
 \item{...}{Covariates (if any)}
 
 If \code{data} is a \code{\link{crwData}} object, the \code{\link{momentuHMMData}} object created by \code{prepData} includes step lengths and turning angles calculated from the best predicted 
@@ -87,6 +94,20 @@ cov2 <- atan2(v,u)
 data <- data.frame(coord1=coord1,coord2=coord2,cov1=cov1,cov2=cov2)
 d <- prepData(data,coordNames=c("coord1","coord2"),covNames="cov1",
               angleCovs="cov2")
+         
+\dontrun{                   
+# use fixPath based on `forest' spatial covariate
+res_raster <- forest
+res_raster[which(raster::getValues(forest)==0)]<-1
+res_raster[which(raster::getValues(forest)>0)]<-0
+
+forestInd <- raster::asFactor(1 - res_raster)
+trans <- gdistance::transition(forestInd, "areas", directions = 16)[[1]]
+fixPath <- list(res_raster = res_raster, trans = trans)
+
+data <- data.frame(x=rep(-10000,100),y=seq(35000,0,length=100))
+d <- prepData(data,fixPath=fixPath)
+}
 
 }
 \seealso{
