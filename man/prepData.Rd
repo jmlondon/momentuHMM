@@ -41,8 +41,9 @@ or \code{\link{MIfitHMM}}.}
 \item{angleCovs}{Character vector indicating the names of any circular-circular regression angular covariates in \code{data} or \code{spatialCovs} that need conversion from standard direction (in radians relative to the x-axis) to turning angle (relative to previous movement direction) 
 using \code{\link{circAngles}}.}
 
-\item{fixPath}{List with elements \code{res_raster} and \code{trans} for correcting coordinates that travel through a restricted area based on \code{\link[gdistance]{shortestPath}}.  See \code{\link[crawl]{fix_path}}.
-When \code{fixPath} is specified, then step lengths, turning angles, and covariates based on location are calculated from the corrected coordinates \code{x.fix} and \code{y.fix}. 
+\item{fixPath}{List with elements \code{res_raster} and \code{trans} for correcting coordinates that travel through a restricted area (e.g. inland for marine mammals) based on \code{\link[gdistance]{shortestPath}}.  See \code{\link[crawl]{fix_path}}.
+When \code{fixPath} is specified, then step lengths, turning angles, and covariates based on location are calculated from the corrected coordinates \code{x} and \code{y}.
+When \code{data} includes tracks for multiple individuals, \code{fixPath} may also be a list of length \code{unique(data$ID)}, where each element is a list with elements \code{res_raster} and \code{trans} for correcting the coordinates for each individual \code{data}.
 Ignored unless \code{coordNames} is specified or \code{data} is a \code{crwData} object.}
 }
 \value{
@@ -51,8 +52,8 @@ An object \code{\link{momentuHMMData}}, i.e., a dataframe of:
 \item{...}{Data streams (e.g., 'step', 'angle', etc.)}
 \item{x}{Either easting or longitude (if \code{coordNames} is specified or \code{data} is a \code{crwData} object)}
 \item{y}{Either norting or latitude (if \code{coordNames} is specified or \code{data} is a \code{crwData} object)}
-\item{x.fix}{Corrected easting (if \code{fixPath} is specified)}
-\item{y.fix}{Corrected northing (if \code{fixPath} is specified)}
+\item{x.orig}{Original uncorrected easting (if \code{fixPath} is specified)}
+\item{y.orig}{Original uncorrected northing (if \code{fixPath} is specified)}
 \item{...}{Covariates (if any)}
 
 If \code{data} is a \code{\link{crwData}} object, the \code{\link{momentuHMMData}} object created by \code{prepData} includes step lengths and turning angles calculated from the best predicted 

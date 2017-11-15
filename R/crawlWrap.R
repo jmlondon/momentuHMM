@@ -201,8 +201,6 @@ crawlWrap<-function(obsData, timeStep=1, ncores, retryFits = 0,
         initial.state[[i]] <- tmpinitial.state
       } 
     }
-  }
-  if(!is.null(names(initial.state)))  {
     if(!all(names(initial.state) %in% ids)) stop("initial.state names must match obsData$ID")
     initial.state <- initial.state[ids]
   } else names(initial.state) <- ids

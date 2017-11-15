@@ -101,7 +101,7 @@ See \code{\link{prepData}}. Ignored unless \code{miData} is a \code{\link{crwDat
 \item{angleCovs}{Character vector indicating the names of any circular-circular regression angular covariates in \code{miData$crwPredict} that need conversion from standard direction (in radians relative to the x-axis) to turning angle (relative to previous movement direction) 
 See \code{\link{prepData}}. Ignored unless \code{miData} is a \code{\link{crwData}} object.}
 
-\item{fixPath}{List with elements `res_raster' and `trans' for correcting coordinates that travel through a restricted area. See \code{\link{prepData}}. Ignored unless \code{miData} is a \code{\link{crwData}} object.}
+\item{fixPath}{List argument for correcting coordinates that travel through a restricted area. See \code{\link{prepData}}. Ignored unless \code{miData} is a \code{\link{crwData}} object.}
 
 \item{method}{Method for obtaining weights for movement parameter samples. See \code{\link[crawl]{crwSimulator}}. Ignored unless \code{miData} is a \code{\link{crwData}} object.}
 

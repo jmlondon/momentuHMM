@@ -29,8 +29,9 @@
 #' or \code{\link{MIfitHMM}}.
 #' @param angleCovs Character vector indicating the names of any circular-circular regression angular covariates in \code{data} or \code{spatialCovs} that need conversion from standard direction (in radians relative to the x-axis) to turning angle (relative to previous movement direction) 
 #' using \code{\link{circAngles}}.
-#' @param fixPath List with elements \code{res_raster} and \code{trans} for correcting coordinates that travel through a restricted area based on \code{\link[gdistance]{shortestPath}}.  See \code{\link[crawl]{fix_path}}.  
-#' When \code{fixPath} is specified, then step lengths, turning angles, and covariates based on location are calculated from the corrected coordinates \code{x.fix} and \code{y.fix}. 
+#' @param fixPath List with elements \code{res_raster} and \code{trans} for correcting coordinates that travel through a restricted area (e.g. inland for marine mammals) based on \code{\link[gdistance]{shortestPath}}.  See \code{\link[crawl]{fix_path}}.  
+#' When \code{fixPath} is specified, then step lengths, turning angles, and covariates based on location are calculated from the corrected coordinates \code{x} and \code{y}.
+#' When \code{data} includes tracks for multiple individuals, \code{fixPath} may also be a list of length \code{unique(data$ID)}, where each element is a list with elements \code{res_raster} and \code{trans} for correcting the coordinates for each individual \code{data}.
 #' Ignored unless \code{coordNames} is specified or \code{data} is a \code{crwData} object.
 
 #' @return An object \code{\link{momentuHMMData}}, i.e., a dataframe of:
@@ -38,8 +39,8 @@
 #' \item{...}{Data streams (e.g., 'step', 'angle', etc.)}
 #' \item{x}{Either easting or longitude (if \code{coordNames} is specified or \code{data} is a \code{crwData} object)}
 #' \item{y}{Either norting or latitude (if \code{coordNames} is specified or \code{data} is a \code{crwData} object)}
-#' \item{x.fix}{Corrected easting (if \code{fixPath} is specified)}
-#' \item{y.fix}{Corrected northing (if \code{fixPath} is specified)}
+#' \item{x.orig}{Original uncorrected easting (if \code{fixPath} is specified)}
+#' \item{y.orig}{Original uncorrected northing (if \code{fixPath} is specified)}
 #' \item{...}{Covariates (if any)}
 #' 
 #' If \code{data} is a \code{\link{crwData}} object, the \code{\link{momentuHMMData}} object created by \code{prepData} includes step lengths and turning angles calculated from the best predicted 
@@ -158,6 +159,9 @@ prepData <- function(data, type=c('UTM','LL'),coordNames=c("x","y"),covNames=NUL
     if(anyDuplicated(spatialcovnames)) stop("spatialCovs must have unique names")
   } else nbSpatialCovs <- 0
   
+  ids <- unique(ID)
+  nbAnimals <- length(ids)
+  
   # check arguments
   type <- match.arg(type)
   if(!is.null(coordNames)){
@@ -167,15 +171,27 @@ prepData <- function(data, type=c('UTM','LL'),coordNames=c("x","y"),covNames=NUL
     x <- data[,coordNames[1]]
     y <- data[,coordNames[2]]
     distnames<-c("step","angle",distnames[-which(distnames %in% coordNames)])
+    
+    if(!is.null(fixPath)){
+      if(!is.null(names(fixPath))){
+        if(all(names(fixPath) %in% c("res_raster","trans"))){
+          tmpfixPath<-fixPath
+          fixPath<-list()
+          for(i in ids){
+            fixPath[[i]] <- tmpfixPath
+          } 
+        }
+        if(!all(names(fixPath) %in% ids)) stop("fixPath names must match ID")
+        fixPath <- fixPath[ids]
+      } else names(fixPath) <- ids
+    }
   }
   
   dataHMM <- data.frame(ID=character())
   
-  nbAnimals <- length(unique(ID))
-  
   # check that each animal's observations are contiguous and fix path
   for(i in 1:nbAnimals) {
-    ind <- which(ID==unique(ID)[i])
+    ind <- which(ID==ids[i])
     if(length(ind)!=length(ind[1]:ind[length(ind)]))
       stop("Each animal's obervations must be contiguous.")
     if(!is.null(coordNames))
@@ -186,9 +202,17 @@ prepData <- function(data, type=c('UTM','LL'),coordNames=c("x","y"),covNames=NUL
       if(type=="LL") stop("coordinate type must be UTM when fixPath is specified")
       tmpDat <- data[ind,]
       if(is.null(tmpDat$time)) tmpDat$time <- 1:length(ind)
-      m <- crawl::fix_path(xy = as.matrix(tmpDat[,coordNames]), time = tmpDat$time, res_raster = fixPath$res_raster, trans = fixPath$trans)
-      x[ind][match(tmpDat$time,m[,"time"],nomatch=0)] <- m[,"x"]
-      y[ind][match(tmpDat$time,m[,"time"],nomatch=0)] <- m[,"y"]
+      cat("\rFixing path for individual",ids[i],"...")
+      m <- tryCatch(crawl::fix_path(xy = as.matrix(tmpDat[,coordNames]), time = tmpDat$time, res_raster = fixPath[[ids[i]]]$res_raster, trans = fixPath[[ids[i]]]$trans),error=function(e) e)
+      if(inherits(m,"error")){
+        cat("FAILED:",m$message,"\n")
+      } else {
+        if("time" %in% colnames(m)){
+          x[ind][match(tmpDat$time,m[,"time"],nomatch=0)] <- m[,"x"]
+          y[ind][match(tmpDat$time,m[,"time"],nomatch=0)] <- m[,"y"]
+        }
+        cat("DONE\n")
+      }
     }
   }
   
@@ -251,17 +275,15 @@ prepData <- function(data, type=c('UTM','LL'),coordNames=c("x","y"),covNames=NUL
   } else covs<-NULL
   
   if(!is.null(coordNames)) {
-    dataHMM <- cbind(dataHMM,x=data[,coordNames[1]],y=data[,coordNames[2]])
-    coords <- c("x","y")
+    dataHMM <- cbind(dataHMM,x=x,y=y)
     if(!is.null(fixPath)){
-      dataHMM <- cbind(dataHMM,x.fix=x,y.fix=y)
-      coords <- c("x.fix","y.fix")
+      dataHMM <- cbind(dataHMM,x.orig=data[,coordNames[1]],y.orig=data[,coordNames[2]])
     }
     class(dataHMM$angle)<-c(class(dataHMM$angle), "angle")
     if(nbSpatialCovs){
       spCovs<-numeric()
       xy<-dataHMM
-      sp::coordinates(xy)<-coords
+      sp::coordinates(xy)<-c("x","y")
       for(j in 1:nbSpatialCovs){
         getCells<-raster::cellFromXY(spatialCovs[[j]],xy)
         if(any(is.na(getCells))) stop("Location data are beyond the spatial extent of the ",spatialcovnames[j]," raster. Try expanding the extent of the raster.")
