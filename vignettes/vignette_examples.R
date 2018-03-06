@@ -1,6 +1,8 @@
 library(sp)
 library(doParallel)
 
+example_wd <- ("~/Documents/Dropbox/current projects/moveHMM extension/momentuHMM/vignette examples/")
+
 append.RData <- function(x, file) {
   old.objects <- load(file)
   save(list = c(old.objects, deparse(substitute(x))), file = file)
@@ -23,7 +25,7 @@ save(activityBudgets,file=paste0(getwd(),"/vignette_inputs.RData"))
 #satPlotStates<-plotSat(as.data.frame(latlongDat),zoom=8,location=c(median(rawData$lon),median(rawData$lat)),ask=FALSE,return=TRUE,states=viterbi(m3),col=c("#009E73", "#F0E442"),stateNames=c("encamped","exploratory"))
 
 acfLag<-24*14
-pdf(file=paste0(getwd(),"/plot_elephantResults%03d.pdf"),onefile=FALSE)
+pdf(file=paste0(getwd(),"/plot_elephantResults%03d.pdf"),onefile=FALSE,width=5,height=5)
 plot(m3,ask=FALSE,plotCI=TRUE,covs=data.frame(hour=12))
 acf(pr[["stepRes"]], lag.max = acfLag, na.action = na.pass, xlab="Lag (hours)", main = "")
 acf(elephantData$step,na.action=na.pass,lag=acfLag,main="",xlab="Lag (hours)")
@@ -32,7 +34,7 @@ dev.off()
 for(plt in seq(1,17)[-c(1,2,9,10,12,13,15,16,17)])
   unlink(paste0("plot_elephantResults0",ifelse(plt>9,"","0"),plt,".pdf"))
 
-png(filename="elephant_plotSat.png",width=5,height=5,units="in",res=90)
+png(filename="elephant_plotSat.png",width=5,height=5,units="in",res=80)
 plotSat(data.frame(x=rawData$lon,y=rawData$lat),zoom=8,location=c(median(rawData$lon),median(rawData$lat)),ask=FALSE)
 dev.off()
 
@@ -48,7 +50,7 @@ nfsTimeInStates<-nfsFits$miSum$Par$timeInStates
 
 append.RData(nfsTimeInStates,file=paste0(getwd(),"/vignette_inputs.RData"))
 
-pdf(file=paste0(getwd(),"/plot_nfsResults.pdf"))
+pdf(file=paste0(getwd(),"/plot_nfsResults.pdf"),width=5,height=5)
 plot(nfsFits,ask=FALSE)
 dev.off()
 rm(list=ls()[-which(ls()=="example_wd" | ls()=="append.RData")])
@@ -200,11 +202,13 @@ library(maps) # for map plots
 library(mapdata) # for map plots
 library(marmap) # to plot bathymetry
 library(sp) # for degAxis
-pdf(file=paste0(getwd(),"/plot_sesResults2.pdf"),width=12,height=6)
+png(file=paste0(getwd(),"/plot_sesResults2.png"),width=12,height=6,units="in",res=80)
 plot(data$x, data$y, axes=FALSE, xlab="longitude", ylab="latitude", col="white")
 degAxis(1)
 degAxis(2)
 map('worldHires', add=TRUE, fill=TRUE, col='white')
+
+pal <- c("#78c679","#F0E442","#E31A1C","#88419d")
 
 for(id in unique(data$ID)) {
   ind <- which(data$ID==id)
@@ -293,11 +297,33 @@ pdf(file=paste0(getwd(),"/plot_harbourSealResults%03d.pdf"),onefile=FALSE)
 plot(miSum.ind,plotCI=TRUE,ask=FALSE)
 dev.off()
 
-for(plt in seq(1,38)[-c(21)])
+for(plt in seq(1,37)[-c(20)])
   unlink(paste0("plot_harbourSealResults0",ifelse(plt>9,"","0"),plt,".pdf"))
 
 rm(list=ls()[-which(ls()=="example_wd")])
 
+###################################################
+### group dynamic example
+###################################################
+#source(paste0(getwd(),"/groupExample.R"))
+load(paste0(example_wd,"groupExample.RData"))
+pdf(file=paste0(getwd(),"/plot_groupExampleCentroid%03d.pdf"),onefile=FALSE)
+plot(centroidData,ask=FALSE)
+dev.off()
+unlink(paste0("plot_groupExampleCentroid002.pdf"))
 
+pdf(file=paste0(getwd(),"/plot_groupExample%03d.pdf"),onefile=FALSE)
+plot(groupData,compact=TRUE,ask=FALSE)
+dev.off()
 
+for(plt in seq(1,nbAnimals+1)[-1])
+  unlink(paste0("plot_groupExample0",ifelse(plt>9,"","0"),plt,".pdf"))
 
+pdf(file=paste0(getwd(),"/plot_groupExampleResults%03d.pdf"),onefile=FALSE)
+plot(groupFit,ask=FALSE)
+dev.off()
+
+for(plt in seq(1,nbAnimals+3)[-c(7,8)])
+  unlink(paste0("plot_groupExampleResults0",ifelse(plt>9,"","0"),plt,".pdf"))
+
+rm(list=ls()[-which(ls()=="example_wd")])
