@@ -106,7 +106,14 @@
 #' fixPath <- list(res_raster = res_raster, trans = trans)
 #' 
 #' data <- data.frame(x=rep(-10000,100),y=seq(35000,0,length=100))
+#' 
+#' #plot original path
+#' plotSpatialCov(data,spatialCov=forest,col="#E69F00",ask=FALSE)
+#' 
 #' d <- prepData(data,fixPath=fixPath)
+#' 
+#' #plot new path
+#' plotSpatialCov(d,spatialCov=forest,col="#56B4E9",ask=FALSE)
 #' }
 #' 
 #' @export
