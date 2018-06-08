@@ -14,4 +14,3 @@ addons:
   apt:
     packages: 
       - ghostscript
-      - graphicsmagick
