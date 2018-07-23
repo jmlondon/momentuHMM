@@ -53,9 +53,14 @@ plotStationary.momentuHMM <- function(model, covs = NULL, col=NULL, plotCI=FALSE
     rawCovs <- model$rawCovs
 
     if(inherits(model,"miSum") & plotCI){
+      if(length(model$conditions$optInd)){
+        Sigma <- matrix(0,length(model$mod$estimate),length(model$mod$estimate))
+        Sigma[(1:length(model$mod$estimate))[-model$conditions$optInd],(1:length(model$mod$estimate))[-model$conditions$optInd]] <- model$MIcombine$variance
+      } else {
         Sigma <- model$MIcombine$variance
+      }
     } else if(!is.null(model$mod$hessian) & plotCI){
-        Sigma <- ginv(model$mod$hessian)
+        Sigma <- model$mod$Sigma
     } else {
         Sigma <- NULL
         plotCI <- FALSE
@@ -141,8 +146,8 @@ plotStationary.momentuHMM <- function(model, covs = NULL, col=NULL, plotCI=FALSE
 }
 
 # for differentiation in delta method
-get_stat <- function(beta,covs,nbStates,i) {
-    gamma <- trMatrix_rcpp(nbStates,beta,covs)[,,1]
+get_stat <- function(beta,covs,nbStates,i,betaRef) {
+    gamma <- trMatrix_rcpp(nbStates,beta,covs,betaRef)[,,1]
     solve(t(diag(nbStates)-gamma+1),rep(1,nbStates))[i]
 }
 
@@ -209,7 +214,7 @@ statPlot<-function(model,beta,Sigma,nbStates,desMat,tempCovs,tmpcovs,cov,alpha,g
 
         for(state in 1:nbStates) {
             dN <- t(apply(desMat, 1, function(x)
-                numDeriv::grad(get_stat,beta,covs=matrix(x,nrow=1),nbStates=nbStates,i=state)))
+                numDeriv::grad(get_stat,beta,covs=matrix(x,nrow=1),nbStates=nbStates,i=state,betaRef=model$conditions$betaRef)))
 
             se <- t(apply(dN, 1, function(x)
                 suppressWarnings(sqrt(x%*%Sigma[gamInd,gamInd]%*%x))))
@@ -240,7 +245,7 @@ plotStationary.miSum <- function(model, covs = NULL, col=NULL, plotCI=FALSE, alp
   model$mle$beta <- model$Par$beta$beta$est
   model$mle$delta <- model$Par$real$delta$est
   model$mod <- list()
-  model$mod$estimate <- model$MIcombine$coefficients
+  model$mod$estimate <- expandPar(model$MIcombine$coefficients,model$conditions$optInd,unlist(model$conditions$fixPar),model$conditions$wparIndex,model$conditions$betaCons,length(model$stateNames),model$covsDelta,model$conditions$stationary,nrow(model$Par$beta$beta$est)-1)
   plotStationary(momentuHMM(model),covs,col,plotCI,alpha,...)
 }
 
