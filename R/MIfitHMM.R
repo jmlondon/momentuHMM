@@ -237,16 +237,16 @@ MIfitHMM<-function(miData,nSims, ncores = 1, poolEstimates = TRUE, alpha = 0.95,
       cat('Drawing',nSims,'realizations from the position process using crawl::crwPostIS... ')
       
       registerDoParallel(cores=ncores)
-      crwSim <- foreach(i = 1:length(ids), .export="crwSimulator") %dorng% {
+      withCallingHandlers(crwSim <- foreach(i = 1:length(ids), .export="crwSimulator") %dorng% {
         if(!is.null(model_fits[[i]]$err.model))
           crawl::crwSimulator(model_fits[[i]],predTime=predData[[Time.name]][which(predData$ID==ids[i] & predData$locType=="p")], method = method, parIS = parIS,
                                   df = dfSim, grid.eps = grid.eps, crit = crit, scale = scaleSim, force.quad = force.quad)
-      }
+      },warning=muffleRNGwarning)
       stopImplicitCluster()
       names(crwSim) <- ids
       
       registerDoParallel(cores=ncores)
-      miData<-
+      withCallingHandlers(miData<-
         foreach(j = 1:nSims, .export=c("crwPostIS","prepData"), .errorhandling="pass") %dorng% {
           locs<-data.frame()
           for(i in 1:length(ids)){
@@ -261,6 +261,7 @@ MIfitHMM<-function(miData,nSims, ncores = 1, poolEstimates = TRUE, alpha = 0.95,
           df<-data.frame(x=locs$mu.x,y=locs$mu.y,predData[,c("ID",distnames,covNames,znames),drop=FALSE])[which(predData$locType=="p"),]
           prepData(df,covNames=covNames,spatialCovs=spatialCovs,centers=centers,centroids=centroids,angleCovs=angleCovs,fixPath=fixPath)
         }
+      ,warning=muffleRNGwarning)
       stopImplicitCluster()
       cat("DONE\n")
       for(i in which(unlist(lapply(miData,function(x) inherits(x,"error"))))){
@@ -339,7 +340,7 @@ MIfitHMM<-function(miData,nSims, ncores = 1, poolEstimates = TRUE, alpha = 0.95,
     delta0[parallelStart:nSims] <- list(tmpPar$delta)
   }
   registerDoParallel(cores=ncores)
-  fits[parallelStart:nSims] <-
+  withCallingHandlers(fits[parallelStart:nSims] <-
     foreach(j = parallelStart:nSims, .export=c("fitHMM"), .errorhandling="pass") %dorng% {
       
       if(nSims>1) cat("     \rImputation ",j,"... ",sep="")
@@ -349,7 +350,8 @@ MIfitHMM<-function(miData,nSims, ncores = 1, poolEstimates = TRUE, alpha = 0.95,
                                       userBounds, workBounds, workcons, betaCons, betaRef, stateNames, knownStates[[j]], fixPar, retryFits, retrySD, optMethod, control, prior, modelName))
       if(retryFits>=1) cat("\n")
       tmpFit
-    }  
+    } 
+  ,warning=muffleRNGwarning)
   stopImplicitCluster()
   cat("DONE\n")
   
